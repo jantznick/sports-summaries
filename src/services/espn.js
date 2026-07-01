@@ -120,6 +120,21 @@ export function getNewsContentUrlFromArticle(article) {
   return null;
 }
 
+export function getArticleWebUrl(article) {
+  const web = article?.links?.web?.href;
+  if (web) {
+    return web;
+  }
+  const mobile = article?.links?.mobile?.href;
+  if (mobile) {
+    return mobile;
+  }
+  if (article?.id) {
+    return `https://www.espn.com/espn/story/_/id/${article.id}`;
+  }
+  return null;
+}
+
 export async function fetchTeamSchedule(leagueKey, teamAbbr, options) {
   return fetchJson(getScheduleUrl(leagueKey, teamAbbr), options);
 }
@@ -447,6 +462,7 @@ async function enrichSingleArticle(article, options) {
     headline,
     body: truncateText(body, 4000),
     published: article.published || article.pubDate || null,
+    url: getArticleWebUrl(article),
   };
 }
 
