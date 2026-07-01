@@ -1,0 +1,21 @@
+{
+  "name": "sports-summaries",
+  "version": "1.0.0",
+  "description": "Backend API that generates bite-sized sports summaries for casual fans",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "download-fixtures": "node scripts/download-fixtures.js",
+    "download-reddit-fixtures": "node scripts/download-reddit-fixtures.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "openai": "^6.45.0"
+  }
+}
