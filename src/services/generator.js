@@ -190,10 +190,11 @@ async function generateTeamEntry(
   let completedGames = [];
   try {
     const schedule = await fetchTeamSchedule(leagueKey, team.abbr, espnOptions);
-    completedGames = extractCompletedGames(schedule, { startDate, endDate }).slice(
-      0,
-      config.gamesPerTeam,
-    );
+    completedGames = extractCompletedGames(schedule, {
+      startDate,
+      endDate,
+      limit: config.gamesPerTeam,
+    });
   } catch (error) {
     warnStep(`${label}/schedule`, error);
     teamEntry.error = errorMessage(error);

@@ -89,10 +89,11 @@ async function main() {
         await downloadNewsArticleFixtures(teamNews, saved, newsHeadlineLimit);
 
         const schedule = await downloadIfNeeded(scheduleUrl, saved);
-        const completedGames = extractCompletedGames(schedule, { startDate, endDate }).slice(
-          0,
-          gamesPerTeam,
-        );
+        const completedGames = extractCompletedGames(schedule, {
+          startDate,
+          endDate,
+          limit: gamesPerTeam,
+        });
 
         console.log(`  ${team.name} (${leagueKey}): ${completedGames.length} recent games`);
 

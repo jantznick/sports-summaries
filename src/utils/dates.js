@@ -1,10 +1,10 @@
-const EST_TIMEZONE = 'America/New_York';
+const GAME_DATE_TIMEZONE = 'America/Chicago';
 
 /**
- * Returns YYYY-MM-DD for the current server date in US Eastern time.
+ * Returns YYYY-MM-DD for the current date in America/Chicago (matches fakefanreport PHP).
  */
 export function getTodayEst() {
-  return formatDateEst(new Date());
+  return formatDateInTimezone(new Date(), GAME_DATE_TIMEZONE);
 }
 
 /**
@@ -31,21 +31,38 @@ export function isValidDateOnly(dateStr) {
 }
 
 /**
- * Last completed game day relative to summary date (summary date minus 1).
+ * Last calendar day (EST) to include when picking completed games.
+ * Matches fakefanreport PHP: most recent finished games through summary date.
  * @param {string} summaryDate - YYYY-MM-DD
  */
 export function getLatestGameDate(summaryDate) {
-  return addDays(summaryDate, -1);
+  return summaryDate;
 }
 
 /**
- * @param {string} summaryDate - YYYY-MM-DD
+ * @param {string} summaryDate - YYYY-MM-DD (EST)
  * @param {number} lookbackDays
  */
 export function getGameWindow(summaryDate, lookbackDays) {
-  const endDate = getLatestGameDate(summaryDate);
+  const endDate = summaryDate;
   const startDate = addDays(endDate, -(lookbackDays - 1));
   return { startDate, endDate };
+}
+
+/**
+ * ESPN event timestamps are UTC ISO strings — convert to YYYY-MM-DD in America/Chicago.
+ * Matches fakefanreport PHP date('Y-m-d', strtotime($event['date'])).
+ * @param {string|Date} value
+ */
+export function toDateOnlyEst(value) {
+  if (!value) {
+    return null;
+  }
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return formatDateInTimezone(date, GAME_DATE_TIMEZONE);
 }
 
 /**
@@ -66,9 +83,9 @@ export function toEspnDate(dateStr) {
   return dateStr.replace(/-/g, '');
 }
 
-function formatDateEst(date) {
+function formatDateInTimezone(date, timeZone) {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: EST_TIMEZONE,
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

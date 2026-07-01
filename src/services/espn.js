@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getLeagueMeta } from '../config/cities.js';
 import { stripHtml, truncateText } from '../utils/html.js';
+import { toDateOnlyEst } from '../utils/dates.js';
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 const ESPN_COMMON_BASE = 'https://site.api.espn.com/apis/common/v3/sports';
@@ -132,18 +133,23 @@ export async function fetchAthleteStats(leagueKey, athleteId, options) {
   return fetchJson(getAthleteStatsUrl(leagueKey, athleteId), options);
 }
 
-export function extractCompletedGames(scheduleData, { startDate, endDate }) {
-  const events = scheduleData?.events || [];
-  return events
-    .filter((event) => {
-      const status = event.competitions?.[0]?.status?.type;
-      if (!status?.completed) {
-        return false;
-      }
-      const gameDate = event.date?.slice(0, 10);
-      return gameDate >= startDate && gameDate <= endDate;
-    })
+export function extractCompletedGames(scheduleData, { startDate, endDate, limit } = {}) {
+  let completed = (scheduleData?.events || [])
+    .filter((event) => event.competitions?.[0]?.status?.type?.completed)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (limit) {
+    completed = completed.slice(0, limit);
+  }
+
+  if (startDate && endDate) {
+    completed = completed.filter((event) => {
+      const gameDate = toDateOnlyEst(event.date);
+      return gameDate && gameDate >= startDate && gameDate <= endDate;
+    });
+  }
+
+  return completed;
 }
 
 function formatStatLine(labels, stats) {
@@ -344,7 +350,7 @@ export async function buildGameContext(summaryData, team, leagueKey, options, ca
 
   return {
     gameId: competition?.id || summaryData?.header?.id,
-    date: competition?.date?.slice(0, 10) || summaryData?.gameInfo?.date?.slice(0, 10),
+    date: toDateOnlyEst(competition?.date) || toDateOnlyEst(summaryData?.gameInfo?.date),
     matchup: competition?.description || summaryData?.header?.description,
     venue: summaryData?.gameInfo?.venue?.fullName,
     status: competition?.status?.type?.description,
