@@ -2,54 +2,48 @@
 
 This document explains how the repo is organized, how data flows through the system, and where to go when you want to change behavior, prompts, teams, or configuration.
 
-For quick setup and API usage, see [README.md](./README.md).
+For quick setup and deployment, see [README.md](./README.md) and [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ---
 
 ## What this repo does
 
-This is a **Node.js/Express backend** that:
+This is a **Node.js cron job** that:
 
-1. Accepts a request for a city (`chicago`, `losangeles`, `newyork`)
-2. Checks if a summary JSON file already exists for that date
-3. If not, fetches sports data from ESPN, sends it to OpenAI, and saves the result
-4. Returns bite-sized summaries aimed at people who don't follow sports
+1. Runs daily (or on demand via `npm run daily-generate`)
+2. Fetches sports data from ESPN and Reddit for each city (`chicago`, `losangeles`, `newyork`)
+3. Sends it to OpenAI for bite-sized summaries
+4. Uploads the result JSON to Backblaze B2
 
-The frontend (or any consumer) hits this API and reads the JSON. This repo does not serve a UI.
+The frontend reads summaries directly from B2. There is no HTTP API in this repo.
 
 ---
 
-## Request flow (high level)
+## Generation flow (high level)
 
 ```
-GET /:city?date=YYYY-MM-DD
+npm run daily-generate
         │
         ▼
-  src/routes/city.js
+  scripts/daily-generate.js
         │
-        ├─ cache exists? ──yes──► return data/cache/{city}/{date}.json
+        ├─ for each city (chicago, losangeles, newyork)
+        │     │
+        │     ▼
+        │  src/services/generator.js
+        │     │
+        │     ├─ for each league (mlb, nfl, nba, nhl)
+        │     │     ├─ fetch league news + Reddit → LLM call
+        │     │     └─ for each team in that city
+        │     │           ├─ fetch schedule → pick recent final games
+        │     │           ├─ for each game → fetch summary → LLM call
+        │     │           └─ fetch team news + Reddit → LLM call
+        │     │
+        │     ▼
+        │  src/services/storage.js → upload to B2 + local cache
         │
-        └─ no cache
-              │
-              ├─ date within MAX_FETCH_DAYS? ──no──► 400 error
-              │
-              └─ yes
-                    │
-                    ▼
-              src/services/generator.js
-                    │
-                    ├─ for each league (mlb, nfl, nba, nhl)
-                    │     ├─ fetch league news → LLM call
-                    │     └─ for each team in that city
-                    │           ├─ fetch schedule → pick recent final games
-                    │           ├─ for each game → fetch summary → LLM call
-                    │           └─ fetch team news → LLM call
-                    │
-                    ▼
-              save to data/cache/{city}/{date}.json
-                    │
-                    ▼
-              return JSON
+        ▼
+  Done
 ```
 
 ---
@@ -60,30 +54,36 @@ GET /:city?date=YYYY-MM-DD
 sports-summaries/
 ├── .env                    # Your local config (not committed)
 ├── .env.example            # Template for all env vars
-├── README.md               # Setup, API reference, test checklist
+├── README.md               # Setup, output format, env vars
 ├── DEVELOPER_GUIDE.md      # This file
+├── DEPLOYMENT.md           # Railway + B2 setup
+├── railway.toml            # Railway cron config
+│
+├── scripts/
+│   ├── daily-generate.js   # Cron entry point
+│   ├── download-fixtures.js
+│   └── download-reddit-fixtures.js
 │
 ├── src/
-│   ├── index.js            # Starts Express server
 │   ├── config/
 │   │   ├── cities.js       # Cities, teams, leagues
-│   │   └── env.js          # Reads .env into a config object
-│   ├── routes/
-│   │   └── city.js         # HTTP routes (/health, /:city)
+│   │   ├── env.js          # Reads .env into a config object
+│   │   └── reddit.js       # Subreddit mappings
 │   ├── services/
-│   │   ├── cache.js        # Read/write cache files + generation lock
+│   │   ├── cache.js        # Local file writes
+│   │   ├── storage.js      # B2 upload
 │   │   ├── espn.js         # ESPN API + fixture loading + data parsing
+│   │   ├── reddit.js       # Reddit fetchers
 │   │   ├── generator.js    # Main orchestration (fetch → prompt → LLM)
 │   │   ├── llm.js          # OpenAI client
 │   │   └── prompts.js      # ★ Prompt templates — edit these first
 │   └── utils/
-│       └── dates.js        # Date math, fetch window validation
-│
-├── scripts/
-│   └── download-fixtures.js  # Downloads ESPN JSON into data/fixtures/
+│       ├── dates.js        # Date math (EST)
+│       ├── openai-cost.js  # Per-call cost logging
+│       └── html.js         # HTML stripping
 │
 └── data/
-    ├── fixtures/           # Saved ESPN responses for offline dev
+    ├── fixtures/           # Saved ESPN + Reddit responses for offline dev
     └── cache/              # Generated summary output (gitignored)
 ```
 
@@ -95,7 +95,7 @@ sports-summaries/
 
 | File | Role |
 |------|------|
-| `src/index.js` | Loads `.env`, builds config, mounts routes, starts server on `PORT` |
+| `scripts/daily-generate.js` | Loads config, generates all cities for a date, uploads to B2 |
 
 ### Configuration
 
@@ -113,18 +113,12 @@ sports-summaries/
 
 To add a city, add a new key to `CITIES` in `src/config/cities.js` and re-run `npm run download-fixtures` if you use fixture mode.
 
-### HTTP layer
+### Storage
 
 | File | Role | Edit when… |
 |------|------|------------|
-| `src/routes/city.js` | Handles `/health` and `GET /:city` | Adding routes, auth, response shape changes |
-
-Key behaviors in `city.js`:
-
-- Default date = today in US Eastern (`getTodayEst()`)
-- Cached files are **always** served, regardless of `MAX_FETCH_DAYS`
-- Uncached requests are blocked if the date is too old
-- Concurrent requests for the same city/date wait on a generation lock
+| `src/services/storage.js` | Uploads JSON to B2 | Changing key paths or upload behavior |
+| `src/services/cache.js` | Writes local copy to `data/cache/` | Changing local output path |
 
 ### Core logic
 
@@ -134,8 +128,8 @@ Key behaviors in `city.js`:
 | `src/services/espn.js` | Fetches/parses ESPN data | Changing data sources, parsing, game selection |
 | `src/services/prompts.js` | Builds prompt strings | **Changing tone, length, instructions** |
 | `src/services/llm.js` | Calls OpenAI | Changing model params, switching providers |
-| `src/services/cache.js` | File cache + lock | Changing cache location or concurrency behavior |
-| `src/utils/dates.js` | Date windows and validation | Changing "yesterday" logic or fetch limits |
+| `src/services/cache.js` | Local file output | Changing cache location |
+| `src/utils/dates.js` | Date windows | Changing "yesterday" logic |
 
 ---
 
@@ -158,14 +152,14 @@ Each prompt receives structured data (scores, headlines, player stats) as plain 
 To test prompt changes without burning OpenAI tokens:
 
 ```bash
-MOCK_LLM=true USE_FIXTURES=true npm start
+MOCK_LLM=true USE_FIXTURES=true npm run daily-generate
 ```
 
 Mock responses won't reflect your new prompts — delete the cache file and set `MOCK_LLM=false` when you're ready to test for real:
 
 ```bash
-rm data/cache/chicago/2026-07-01.json
-curl "http://localhost:3000/chicago?date=2026-07-01"
+rm data/cache/chicago.json
+MOCK_LLM=false USE_FIXTURES=true npm run daily-generate -- 2026-07-01
 ```
 
 ### LLM model and parameters
@@ -263,7 +257,7 @@ Current shape per team:
 
 1. Add entry to `CITIES` in `src/config/cities.js`
 2. Run `npm run download-fixtures` to save ESPN data for offline dev
-3. Test: `curl http://localhost:3000/yourcityslug`
+3. Test: `npm run daily-generate -- 2026-07-01` and inspect `data/cache/yourcityslug.json`
 
 ### Adding a new league
 
@@ -279,17 +273,18 @@ All defined in `.env.example`. Loaded by `src/config/env.js`.
 
 | Variable | Purpose |
 |----------|---------|
-| `PORT` | Server port |
 | `OPENAI_API_KEY` | OpenAI auth (required unless `MOCK_LLM=true`) |
 | `OPENAI_MODEL` | Model slug |
 | `MOCK_LLM` | Skip OpenAI; return placeholder text |
+| `STORAGE_BACKEND` | `auto`, `b2`, or `local` |
+| `B2_*` | Backblaze B2 credentials and key prefix |
 | `USE_FIXTURES` | Read ESPN data from `data/fixtures/` instead of live API |
 | `FIXTURES_DIR` | Path to fixture files |
-| `CACHE_DIR` | Path to generated summary cache |
-| `MAX_FETCH_DAYS` | Block uncached generation for dates older than this |
+| `CACHE_DIR` | Path to local copy of generated summaries |
 | `GAME_LOOKBACK_DAYS` | How far back to search for games |
 | `GAMES_PER_TEAM` | Max recent games per team |
 | `NEWS_HEADLINE_LIMIT` | Headlines per news prompt |
+| `REDDIT_*` | Reddit integration settings |
 
 ---
 
@@ -313,10 +308,10 @@ If you add teams or change `NEWS_HEADLINE_LIMIT`, re-run the download script so 
 
 ### `data/cache/` — Generated summaries
 
-- Created automatically on first request for a city/date
-- Path: `data/cache/{city}/{YYYY-MM-DD}.json`
+- Created by `npm run daily-generate`
+- Path: `data/cache/{city}.json` (current), `data/cache/{date-1}-{city}.json` (archived before each run)
 - **Gitignored** — safe to delete when re-testing generation
-- Once written, always served as-is (no re-generation until you delete the file)
+- Also uploaded to B2 at `{B2_KEY_PREFIX}{city}.json` (overwritten each run)
 
 ---
 
@@ -360,26 +355,24 @@ URL builders are in `src/services/espn.js` (`getScheduleUrl`, `getSummaryUrl`, e
 ### 1. Zero-cost iteration (fixtures + mock)
 
 ```bash
-USE_FIXTURES=true MOCK_LLM=true npm start
+STORAGE_BACKEND=local USE_FIXTURES=true MOCK_LLM=true npm run daily-generate
 ```
 
-Verifies routing, caching, JSON shape, and game selection. Does not test prompt quality.
+Verifies generation, JSON shape, and game selection. Does not test prompt quality.
 
 ### 2. Test prompts with real LLM, no ESPN calls
 
 ```bash
-USE_FIXTURES=true MOCK_LLM=false npm start
-rm data/cache/chicago/2026-07-01.json   # clear cache to regenerate
-curl "http://localhost:3000/chicago?date=2026-07-01"
+STORAGE_BACKEND=local USE_FIXTURES=true MOCK_LLM=false npm run daily-generate -- 2026-07-01
 ```
 
 ### 3. Full live run
 
 ```bash
-USE_FIXTURES=false MOCK_LLM=false npm start
+STORAGE_BACKEND=b2 USE_FIXTURES=false MOCK_LLM=false npm run daily-generate
 ```
 
-Hits ESPN and OpenAI live. Use sparingly.
+Hits ESPN, Reddit, and OpenAI live. Uploads to B2.
 
 ### 4. Refresh fixtures
 
@@ -395,14 +388,11 @@ Downloads schedules, game summaries, league news, and team news for all configur
 
 Run through these after making changes:
 
-- [ ] `curl http://localhost:3000/health` — returns city list
-- [ ] `curl http://localhost:3000/chicago` — returns full JSON
-- [ ] Second identical request returns `"cacheHit": true`
+- [ ] `STORAGE_BACKEND=local USE_FIXTURES=true MOCK_LLM=true npm run daily-generate` completes without errors
+- [ ] `data/cache/chicago.json` exists and has full JSON with a `date` field
 - [ ] Off-season teams have `skippedReason`, not empty errors
 - [ ] In-season teams have up to `GAMES_PER_TEAM` entries in `recentGames`
-- [ ] `curl "http://localhost:3000/chicago?date=2020-01-01"` returns 400 (unless cached)
-- [ ] `curl http://localhost:3000/boston` returns 404
-- [ ] Inspect `sourceArticles` in output to verify news quality (should include full article bodies)
+- [ ] Inspect `sourceArticles` in output to verify news quality
 - [ ] Delete cache file, regenerate, confirm prompt changes took effect
 
 ---
@@ -418,11 +408,9 @@ Run through these after making changes:
 | Change how many games per team | `.env` → `GAMES_PER_TEAM` |
 | Change game date window | `.env` → `GAME_LOOKBACK_DAYS` + `src/utils/dates.js` |
 | Improve team news filtering | `src/services/espn.js` → `filterTeamNewsFromLeague()` |
-| Add a new API endpoint | `src/routes/city.js` |
 | Change cached JSON structure | `src/services/generator.js` |
-| Add auth to the API | `src/routes/city.js` (middleware before handlers) |
+| Change B2 key path | `.env` → `B2_KEY_PREFIX` + `src/services/storage.js` |
 | Switch from OpenAI to another provider | `src/services/llm.js` |
-| Prevent old-date API abuse | `.env` → `MAX_FETCH_DAYS` |
 
 ---
 
@@ -430,16 +418,16 @@ Run through these after making changes:
 
 | Command | What it does |
 |---------|--------------|
-| `npm start` | Run the server |
-| `npm run dev` | Run with auto-restart on file changes |
+| `npm run daily-generate` | Generate all cities and upload to B2 |
 | `npm run download-fixtures` | Download/update ESPN fixture files |
+| `npm run download-reddit-fixtures` | Download/update Reddit fixture files |
 
 ---
 
 ## Notes and gotchas
 
-- **Dates use server EST.** The client cannot override timezone; `date` query param is just `YYYY-MM-DD`.
-- **Cache is permanent until deleted.** There is no cache busting endpoint. Delete files in `data/cache/` to force regeneration.
+- **Dates use EST.** The cron defaults to today in US Eastern time. Pass a date arg to backfill: `npm run daily-generate -- 2026-07-01`.
+- **Re-running overwrites.** Each run replaces the B2 object and local `{city}.json` file for that city.
 - **Team news is often empty** from ESPN's direct endpoint. The fallback filters league news by team name — results vary.
 - **Same game, multiple LLM calls.** If the Lakers and Clippers both played each other, each team gets its own game summary call with a team-focused prompt.
 - **Fixture files must match config.** If you change `NEWS_HEADLINE_LIMIT` or add teams, re-run `download-fixtures`.

@@ -1,53 +1,31 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-const locks = new Map();
-
-export function getCachePath(cacheDir, citySlug, dateStr) {
-  return path.join(cacheDir, citySlug, `${dateStr}.json`);
+export function getCachePath(cacheDir, citySlug) {
+  return path.join(cacheDir, `${citySlug}.json`);
 }
 
-export async function readCache(cacheDir, citySlug, dateStr) {
-  const filePath = getCachePath(cacheDir, citySlug, dateStr);
+export function getArchiveCachePath(cacheDir, archiveDate, citySlug) {
+  return path.join(cacheDir, `${archiveDate}-${citySlug}.json`);
+}
+
+export async function archiveCache(cacheDir, citySlug, archiveDate) {
+  const sourcePath = getCachePath(cacheDir, citySlug);
+  const archivePath = getArchiveCachePath(cacheDir, archiveDate, citySlug);
+
   try {
-    const raw = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return null;
-    }
-    throw error;
+    await fs.access(sourcePath);
+  } catch {
+    return false;
   }
+
+  await fs.mkdir(path.dirname(archivePath), { recursive: true });
+  await fs.copyFile(sourcePath, archivePath);
+  console.log(`[cache] archived ${sourcePath} → ${archivePath}`);
 }
 
-export async function writeCache(cacheDir, citySlug, dateStr, payload) {
-  const filePath = getCachePath(cacheDir, citySlug, dateStr);
+export async function writeCache(cacheDir, citySlug, payload) {
+  const filePath = getCachePath(cacheDir, citySlug);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-}
-
-/**
- * Ensures only one generation runs per city/date at a time.
- * @template T
- * @param {string} key
- * @param {() => Promise<T>} fn
- * @returns {Promise<T>}
- */
-export async function withGenerationLock(key, fn) {
-  while (locks.has(key)) {
-    await locks.get(key);
-  }
-
-  let release;
-  const gate = new Promise((resolve) => {
-    release = resolve;
-  });
-  locks.set(key, gate);
-
-  try {
-    return await fn();
-  } finally {
-    locks.delete(key);
-    release();
-  }
 }

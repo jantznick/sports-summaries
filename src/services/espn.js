@@ -191,12 +191,10 @@ async function getCachedTeamInfo(leagueKey, teamAbbr, options, cache) {
     cache.teamInfo.set(key, info);
     return info;
   } catch (error) {
-    if (options.useFixtures && error.code === 'ENOENT') {
-      const empty = { record: null, standing: null, homeRecord: null, awayRecord: null };
-      cache.teamInfo.set(key, empty);
-      return empty;
-    }
-    throw error;
+    console.warn(`[espn] Team info unavailable for ${teamAbbr}: ${error.message}`);
+    const empty = { record: null, standing: null, homeRecord: null, awayRecord: null };
+    cache.teamInfo.set(key, empty);
+    return empty;
   }
 }
 
@@ -297,12 +295,9 @@ async function enrichPlayerProfiles(players, leagueKey, options, cache) {
         statProfile = parseAthleteStatCategories(statsData);
         cache.athleteStats.set(cacheKey, statProfile);
       } catch (error) {
-        if (options.useFixtures && error.code === 'ENOENT') {
-          statProfile = { season: [], career: [] };
-          cache.athleteStats.set(cacheKey, statProfile);
-        } else {
-          throw error;
-        }
+        console.warn(`[espn] Athlete stats unavailable for ${player.name}: ${error.message}`);
+        statProfile = { season: [], career: [] };
+        cache.athleteStats.set(cacheKey, statProfile);
       }
     }
 
@@ -426,9 +421,7 @@ async function enrichSingleArticle(article, options) {
       headline = item.headline || headline;
       body = stripHtml(item.story || item.description || body);
     } catch (error) {
-      if (!options.useFixtures || error.code !== 'ENOENT') {
-        throw error;
-      }
+      console.warn(`[espn] Article body unavailable for ${headline || article.id}: ${error.message}`);
     }
   }
 
@@ -482,14 +475,17 @@ export async function resolveTeamNews(leagueKey, team, limit, options) {
       return directArticles;
     }
   } catch (error) {
-    if (!options.useFixtures || error.code !== 'ENOENT') {
-      throw error;
-    }
+    console.warn(`[espn] Direct team news failed for ${team.abbr}: ${error.message}`);
   }
 
-  const leagueNews = await fetchLeagueNews(leagueKey, 50, options);
-  const filtered = filterTeamNewsFromLeague(leagueNews, team, limit);
-  return enrichNewsArticles(filtered, limit, options);
+  try {
+    const leagueNews = await fetchLeagueNews(leagueKey, 50, options);
+    const filtered = filterTeamNewsFromLeague(leagueNews, team, limit);
+    return enrichNewsArticles(filtered, limit, options);
+  } catch (error) {
+    console.warn(`[espn] League news fallback failed for ${team.abbr}: ${error.message}`);
+    return [];
+  }
 }
 
 export { ESPN_BASE };

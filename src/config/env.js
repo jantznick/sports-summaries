@@ -19,9 +19,11 @@ function readFloat(name) {
 }
 
 export function loadConfig() {
+  const storageBackend = (process.env.STORAGE_BACKEND || 'auto').toLowerCase();
+
   return {
-    port: readInt('PORT', 3000),
     nodeEnv: process.env.NODE_ENV || 'development',
+    storageBackend,
     openAiApiKey: process.env.OPENAI_API_KEY || '',
     openAiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     openAiInputCostPer1M: readFloat('OPENAI_INPUT_COST_PER_1M'),
@@ -30,7 +32,6 @@ export function loadConfig() {
     cacheDir: path.resolve(process.env.CACHE_DIR || './data/cache'),
     fixturesDir: path.resolve(process.env.FIXTURES_DIR || './data/fixtures'),
     useFixtures: readBool('USE_FIXTURES', false),
-    maxFetchDays: readInt('MAX_FETCH_DAYS', 7),
     gameLookbackDays: readInt('GAME_LOOKBACK_DAYS', 30),
     gamesPerTeam: readInt('GAMES_PER_TEAM', 2),
     newsHeadlineLimit: readInt('NEWS_HEADLINE_LIMIT', 5),
@@ -38,5 +39,11 @@ export function loadConfig() {
     redditPostLimit: readInt('REDDIT_POST_LIMIT', 10),
     redditListingLimit: readInt('REDDIT_LISTING_LIMIT', 25),
     redditUserAgent: process.env.REDDIT_USER_AGENT || 'sports-summaries/1.0.0 (local dev)',
+    b2KeyId: process.env.B2_KEY_ID || '',
+    b2ApplicationKey: process.env.B2_APPLICATION_KEY || '',
+    b2Bucket: process.env.B2_BUCKET || '',
+    b2Endpoint: process.env.B2_ENDPOINT || '',
+    b2Region: process.env.B2_REGION || 'us-east-1',
+    b2KeyPrefix: process.env.B2_KEY_PREFIX || 'summaries/',
   };
 }

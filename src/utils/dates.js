@@ -31,36 +31,6 @@ export function isValidDateOnly(dateStr) {
 }
 
 /**
- * @param {string} requestedDate - YYYY-MM-DD
- * @param {number} maxFetchDays
- * @returns {{ allowed: boolean, today: string, earliestAllowed: string }}
- */
-export function validateFetchWindow(requestedDate, maxFetchDays) {
-  const today = getTodayEst();
-  const earliestAllowed = addDays(today, -(maxFetchDays - 1));
-
-  if (requestedDate > today) {
-    return {
-      allowed: false,
-      reason: `Date ${requestedDate} is in the future. Today (EST) is ${today}.`,
-      today,
-      earliestAllowed,
-    };
-  }
-
-  if (requestedDate < earliestAllowed) {
-    return {
-      allowed: false,
-      reason: `Date ${requestedDate} is outside the allowed window. Earliest allowed date is ${earliestAllowed}.`,
-      today,
-      earliestAllowed,
-    };
-  }
-
-  return { allowed: true, today, earliestAllowed };
-}
-
-/**
  * Last completed game day relative to summary date (summary date minus 1).
  * @param {string} summaryDate - YYYY-MM-DD
  */
