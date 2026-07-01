@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'fs/promises';
 import path from 'path';
 import { CITIES, LEAGUES, getTeamsForLeague } from '../src/config/cities.js';
-import { addDays, getTodayEst } from '../src/utils/dates.js';
+import { addDays, getGameWindow, getTodayEst } from '../src/utils/dates.js';
 import {
   collectNotablePlayerIds,
   extractCompletedGames,
@@ -59,8 +59,7 @@ async function downloadNewsArticleFixtures(newsData, saved, limit) {
 
 async function main() {
   const summaryDate = getTodayEst();
-  const endDate = addDays(summaryDate, -1);
-  const startDate = addDays(endDate, -(gameLookbackDays - 1));
+  const { startDate, endDate } = getGameWindow(summaryDate, gameLookbackDays);
   const saved = new Set();
 
   console.log(`Downloading fixtures to ${fixturesDir}`);

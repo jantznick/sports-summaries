@@ -4,7 +4,7 @@ Daily cron job that fetches ESPN + Reddit data, summarizes it with OpenAI, and u
 
 The frontend reads summaries directly from B2 — there is no API server in this repo.
 
-**Deploying?** See [DEPLOYMENT.md](./DEPLOYMENT.md) for Railway + B2 setup.
+**Deploying?** See [DEPLOYMENT.md](./DEPLOYMENT.md) for GitHub Actions + B2 setup.
 
 **New to the codebase?** See [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) for file layout, prompts, and data flow.
 

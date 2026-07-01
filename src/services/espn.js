@@ -47,20 +47,31 @@ async function writeFixture(fixturesDir, url, data) {
   await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
-async function fetchJson(url, { useFixtures, fixturesDir, saveFixture = false }) {
-  if (useFixtures) {
-    return readFixture(fixturesDir, url);
-  }
-
+async function fetchLiveJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`ESPN request failed (${response.status}) for ${url}`);
   }
+  return response.json();
+}
 
-  const data = await response.json();
-  if (saveFixture) {
+async function fetchJson(url, { useFixtures, fixturesDir, saveFixture = false }) {
+  if (useFixtures) {
+    try {
+      return await readFixture(fixturesDir, url);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  const data = await fetchLiveJson(url);
+
+  if (useFixtures || saveFixture) {
     await writeFixture(fixturesDir, url, data);
   }
+
   return data;
 }
 

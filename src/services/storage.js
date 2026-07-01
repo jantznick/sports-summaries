@@ -51,6 +51,11 @@ export function getStorageBackend(config) {
   return useB2(config) ? 'b2' : 'local';
 }
 
+export function destroyS3Client() {
+  s3Client?.destroy?.();
+  s3Client = undefined;
+}
+
 export async function writeSummary(citySlug, payload, config) {
   const archiveDate = addDays(payload.date, -1);
 

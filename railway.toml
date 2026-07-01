@@ -1,8 +1,0 @@
-# Railway cron — generates summaries daily and uploads to Backblaze B2
-[build]
-builder = "nixpacks"
-
-[deploy]
-startCommand = "npm run daily-generate"
-cronSchedule = "0 11 * * *"
-restartPolicyType = "NEVER"

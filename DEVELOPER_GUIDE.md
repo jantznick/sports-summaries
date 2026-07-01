@@ -56,8 +56,8 @@ sports-summaries/
 ├── .env.example            # Template for all env vars
 ├── README.md               # Setup, output format, env vars
 ├── DEVELOPER_GUIDE.md      # This file
-├── DEPLOYMENT.md           # Railway + B2 setup
-├── railway.toml            # Railway cron config
+├── DEPLOYMENT.md           # GitHub Actions + B2 setup
+├── .github/workflows/      # daily-generate.yml cron
 │
 ├── scripts/
 │   ├── daily-generate.js   # Cron entry point

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { SUPPORTED_CITIES, getCity } from '../src/config/cities.js';
 import { loadConfig } from '../src/config/env.js';
 import { countGenerationErrors, generateCitySummary } from '../src/services/generator.js';
-import { getStorageBackend, writeSummary } from '../src/services/storage.js';
+import { getStorageBackend, writeSummary, destroyS3Client } from '../src/services/storage.js';
 import { getTodayEst, isValidDateOnly } from '../src/utils/dates.js';
 
 async function main() {
@@ -47,13 +47,17 @@ async function main() {
 
   if (failedCities.length > 0) {
     console.error(`\nFailed cities: ${failedCities.join(', ')}`);
+    destroyS3Client();
     process.exit(1);
   }
 
   console.log('\nAll cities uploaded.');
+  destroyS3Client();
+  process.exit(0);
 }
 
 main().catch((error) => {
   console.error(error);
+  destroyS3Client();
   process.exit(1);
 });

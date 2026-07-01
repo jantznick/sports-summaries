@@ -1,0 +1,67 @@
+name: Daily generate
+
+on:
+  schedule:
+    # GitHub cron is UTC-only. 08:00 and 09:00 UTC cover 4:00 AM America/New_York
+    # (EDT and EST). The should-run job exits early unless the Eastern hour is 04.
+    - cron: '0 8 * * *'
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  should-run:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: Check schedule
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run — proceeding."
+            exit 0
+          fi
+          HOUR=$(TZ=America/New_York date +%H)
+          if [ "$HOUR" = "04" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "4am America/New_York — proceeding."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping — America/New_York hour is ${HOUR}, want 04."
+          fi
+
+  generate:
+    needs: should-run
+    if: needs.should-run.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate summaries and upload to B2
+        env:
+          NODE_ENV: production
+          STORAGE_BACKEND: b2
+          USE_FIXTURES: 'false'
+          MOCK_LLM: 'false'
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_BUCKET: ${{ secrets.B2_BUCKET }}
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+          B2_KEY_PREFIX: ${{ vars.B2_KEY_PREFIX }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+          REDDIT_ENABLED: 'true'
+        run: node scripts/daily-generate.js
