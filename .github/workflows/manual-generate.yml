@@ -1,8 +1,12 @@
-name: Daily generate
+name: Manual generate
 
 on:
-  schedule:
-    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      summary_date:
+        description: Summary date (YYYY-MM-DD). Leave blank for today (America/Chicago).
+        required: false
+        type: string
 
 jobs:
   generate:
@@ -36,4 +40,9 @@ jobs:
           B2_KEY_PREFIX: ${{ vars.B2_KEY_PREFIX }}
           REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
           REDDIT_ENABLED: 'true'
-        run: node scripts/daily-generate.js
+        run: |
+          if [ -n "${{ inputs.summary_date }}" ]; then
+            node scripts/daily-generate.js "${{ inputs.summary_date }}"
+          else
+            node scripts/daily-generate.js
+          fi

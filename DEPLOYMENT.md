@@ -7,7 +7,7 @@ This repo runs a **daily GitHub Actions workflow** that generates summaries and 
 ## Architecture
 
 ```text
-GitHub Actions (daily, 4:00 AM America/New_York)
+GitHub Actions (daily, 05:00 UTC)
   → node scripts/daily-generate.js
   → generate chicago, losangeles, newyork
   → upload to B2: summaries/{city}.json
@@ -52,9 +52,9 @@ Workflow file: [`.github/workflows/daily-generate.yml`](./.github/workflows/dail
 
 ### Schedule
 
-Runs at **4:00 AM America/New_York** (handles EST/EDT). GitHub cron is UTC-only, so the workflow fires at 08:00 and 09:00 UTC and skips unless the Eastern hour is 04.
+Runs daily at **05:00 UTC** (`0 5 * * *`). That is midnight EST / 1:00 AM EDT.
 
-**Manual run:** Actions → *Daily generate* → *Run workflow*
+**Manual run:** Actions → *Manual generate* → *Run workflow* (optional date for backfill)
 
 ---
 
