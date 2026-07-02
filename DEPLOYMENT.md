@@ -31,9 +31,9 @@ Workflow file: [`.github/workflows/daily-generate.yml`](./.github/workflows/dail
 
 ## GitHub Actions setup
 
-### Secrets (Settings → Environments → **production**)
+### Secrets (Settings → Environments → **elegant-prosperity / production**)
 
-Workflows use `environment: production`, so secrets and variables must be set on the **production** environment (or at repository level, which also works).
+Workflows use `environment: elegant-prosperity/production`, so secrets and variables must be set on that environment.
 
 | Secret | Required |
 |--------|----------|
@@ -47,7 +47,7 @@ Workflows use `environment: production`, so secrets and variables must be set on
 
 ### Variables (optional)
 
-Set on the **production** environment (or repository). Defaults apply if unset:
+Set on the **elegant-prosperity / production** environment. Defaults apply if unset:
 
 | Variable | Default |
 |----------|---------|

@@ -11,7 +11,7 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    environment: production
+    environment: elegant-prosperity/production
     timeout-minutes: 120
 
     steps:
