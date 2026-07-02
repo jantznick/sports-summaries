@@ -31,7 +31,9 @@ Workflow file: [`.github/workflows/daily-generate.yml`](./.github/workflows/dail
 
 ## GitHub Actions setup
 
-### Secrets (Settings → Secrets and variables → Actions)
+### Secrets (Settings → Environments → **production**)
+
+Workflows use `environment: production`, so secrets and variables must be set on the **production** environment (or at repository level, which also works).
 
 | Secret | Required |
 |--------|----------|
@@ -44,6 +46,8 @@ Workflow file: [`.github/workflows/daily-generate.yml`](./.github/workflows/dail
 | `REDDIT_USER_AGENT` | Recommended |
 
 ### Variables (optional)
+
+Set on the **production** environment (or repository). Defaults apply if unset:
 
 | Variable | Default |
 |----------|---------|
